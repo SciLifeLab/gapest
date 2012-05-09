@@ -1,3 +1,14 @@
+'''
+
+Created on Sep 23, 2011
+
+@author: ksahlin
+
+Copyright: Kristoffer Sahlin
+License: GPL, see file License.txt
+
+
+'''
 import sys
 import Contig,Scaffold
 from scipy.special import erf

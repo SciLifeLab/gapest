@@ -2,10 +2,6 @@
 Created on Sep 29, 2011
 
 @author: ksahlin
-
-Copyright: Kristoffer Sahlin
-License: GPL, see file License.txt
-
 '''
 
 class scaffold:
