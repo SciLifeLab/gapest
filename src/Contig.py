@@ -2,10 +2,6 @@
 Created on Sep 29, 2011
 
 @author: ksahlin
-
-Copyright: Kristoffer Sahlin
-License: GPL, see file License.txt
-
 '''
 class contig:
     def __init__(self, contig_name,contig_scaffold= None ,contig_direction = None ,contig_position = None, contig_length = None,contig_sequence=None, contig_links={} ):

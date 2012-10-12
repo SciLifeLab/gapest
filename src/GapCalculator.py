@@ -1,24 +1,15 @@
-'''
-
-Created on Sep 23, 2011
-
-@author: ksahlin
-
-Copyright: Kristoffer Sahlin
-License: GPL, see file License.txt
-
-
-'''
 import sys
 import Contig,Scaffold
 from scipy.special import erf
 from scipy.stats import norm
 from scipy.constants import pi
-def GapEstimator(G,Contigs,Scaffolds,mean,sigma,read_length,dValuesTable,edge_support):
+from math import exp
+def GapEstimator(G,Contigs,Scaffolds,mean,sigma,read_length,edge_support):
     gap_mean=0
     gap_obs=0
     gap_obs2=0
     gap_counter=0
+    print 'CONTIG1\tCONTIG2\tGAP_ESTIMATION\tNUMBER_OF_OBSERVATIONS\tWARNINGS/ERRORS'
     for edge in G.edges_iter():
         if G[edge[0]][edge[1]]['nr_links'] != None:
             c1=edge[0][0]
@@ -27,68 +18,37 @@ def GapEstimator(G,Contigs,Scaffolds,mean,sigma,read_length,dValuesTable,edge_su
             c2_len=G.node[edge[1]]['length']
             obs_list=G.edge[edge[0]][edge[1]]['gap_dist']
             nr_links=G.edge[edge[0]][edge[1]]['nr_links']
-            if nr_links >= edge_support:
-                # if long contigs, use pre calculated d_ML fcn
-                if (c1_len > mean+6*sigma) and (c1_len > mean+6*sigma):
-                    d_ML,stdErr=CalcGapLongContigs(obs_list,nr_links,mean,sigma,read_length,c1_len,c2_len,dValuesTable)
-                    #print 'Longa contigs'
-
-                #calculate d_ML for particular contig lengths
-                else:
-                    d_ML,stdErr=CalcMLvaluesOfdGeneral(obs_list,mean,sigma,read_length,c1_len,c2_len,nr_links)               
+            #pre check for large deviations in obs list
+            sorted_observations = sorted(obs_list)
+            smallest_obs_mean = sum(sorted_observations[0:10])/10.0
+            largest_obs_mean = sum(sorted_observations[-10:])/10.0
+            #print largest_obs_mean,smallest_obs_mean
+            if nr_links >= edge_support and largest_obs_mean-smallest_obs_mean < 6*sigma:
+                d_ML,stdErr=CalcMLvaluesOfdGeneral(obs_list,mean,sigma,read_length,c1_len,c2_len,nr_links)               
                 
                 gap_obs+=d_ML
                 gap_obs2+=d_ML**2
                 gap_counter+=1
-                print "gap distance: ",d_ML,'between: ', Scaffolds[c1].contigs[0].name,' and ', Scaffolds[c2].contigs[0].name, 'Number of links: ',nr_links #, 'Data obs: ', (nr_links*mean -int(sum(obs_list)))/float(nr_links)
-                #,'std_err: ',stdErr,c1_len,c2_len, 'OBS= ',(nr_links*mean -int(sum(obs_list)))/float(nr_links), nr_links
+                warn = 0
+                if c1_len < 2*sigma and c2_len < 2*sigma:
+                    warn = 1
+                if warn == 1:
+                    print Scaffolds[c1].contigs[0].name + '\t'+ Scaffolds[c2].contigs[0].name+ '\t'+str(d_ML) +'\t'+str(nr_links)+'\tw'
+                else:
+                    print Scaffolds[c1].contigs[0].name + '\t'+ Scaffolds[c2].contigs[0].name+ '\t'+str(d_ML) +'\t'+str(nr_links)+'\t-'
+
+
+            elif nr_links < edge_support:
+                print Scaffolds[c1].contigs[0].name + '\t'+ Scaffolds[c2].contigs[0].name+ '\t.\t.\te1'
+            elif largest_obs_mean-smallest_obs_mean < 6*sigma:
+                print Scaffolds[c1].contigs[0].name + '\t'+ Scaffolds[c2].contigs[0].name+ '\t.\t.\te2'
+                    
+    print 'w : Both contig lengths were smaller than 2*std_dev of lib (heuristic threshold set by me from experience). This can give shaky estimations in some cases.'
+    print 'e1 : No gap was calculated. Number of links were lower than specified min nr of links parameter: -e <min nr links> (default 10). Lower this value if necessary (estimations may become unstable)'
+    print 'e2 : No gap was calculated. The spread of the links throughout the contig is to far (i.e largest_obs_mean-smallest_obs_mean < 6*sigma ), suggesting errors in mapping on this region.',
+                
     gap_mean=gap_obs/float(gap_counter)
     gap_sigma=gap_obs2-gap_counter*gap_mean**2
-    print "Avg gap: ",gap_mean ,"Std_gap_estimate: ", (gap_sigma/(gap_counter-1))**(0.5) , "nr of gaps: ",gap_counter
-
-
-
-
-def CalcGapLongContigs(obs_list,nr_links,mean,stdDev,readLen,c1_len,c2_len,dValuesTable):  
-    #get observation    
-    data_observation=(nr_links*mean -int(sum(obs_list)))/float(nr_links)
-    MLgap=dValuesTable[int(round(data_observation,0))][0]
-    stdErr=(1.0/(nr_links*dValuesTable[int(round(data_observation,0))][1]))**0.5
-    return(MLgap,stdErr)
-
-def PreCalcMLvaluesOfdLongContigs(mean,stdDev,readLen):
-    def Nom(z,mean,stdDev):
-        nom=-(1+erf((mean-d-2*readLen+1)/(2**0.5*float(stdDev))))*(pi/2)**0.5
-        return nom
-    def Denom(d,readLen,mean,stdDev):
-        first=-((pi/2)**0.5)*(d+2*readLen-mean-1)*(1+erf((mean-d-2*readLen+1)/(2**0.5*float(stdDev))))
-        second=stdDev*2.718**(-((mean-d-2*readLen+1)**2)/(float(2*stdDev**2)))
-        denom=first+second
-        return denom
-
-    def CalcAofd(d):
-        #transform to z ~N(0,1)
-        z=((d+2*readLen)-mean)/float(stdDev)    
-        nom=Nom(z,mean,stdDev)
-        denom=Denom(d,readLen,mean,stdDev)
-        val=nom/denom              
-        return val
-    #we cannot 
-    d_upper=mean+6*stdDev
-    d_lower=-2*stdDev
-    dValuesTable={}
-    for d in range(d_lower,d_upper+1):
-        Aofd=CalcAofd(d)
-        obs=d+Aofd*stdDev**2
-        obs=int(round(obs,0))
-        #print d,obs
-        Iofd=1.0/(stdDev**2)+Aofd**2
-        #print Iofd,stdDev
-        # a table with observation as key and the information function I(d) for d
-        # to get std err and CI of ML estimate for d, do calc: sqrt(1.0/(n*I(d)))
-        dValuesTable[obs]=(d,Iofd)
-        
-    return dValuesTable
 
 def funcDGeneral(obs_list,d,mean,stdDev,c1Len,c2Len,readLen):
     #get observation    
@@ -108,12 +68,12 @@ def funcDGeneral(obs_list,d,mean,stdDev,c1Len,c2Len,readLen):
         term2=(c_min-readLen+1)/2.0*(erf((c_max+d+readLen-mean)/((2**0.5)*stdDev))- erf((c_min+d+readLen-mean)/((2**0.5)*stdDev))   )
     
         first=-((pi/2)**0.5)*(d+2*readLen-mean-1)*( erf((c_min+d+readLen-mean)/(2**0.5*float(stdDev))) - erf((d+2*readLen-1-mean)/(2**0.5*float(stdDev)))  )
-        second=stdDev*( 2.718**(-( (d+2*readLen-1-mean)**2)/(float(2*stdDev**2))) - 2.718**(-( (c_min+d+readLen-mean)**2)/(float(2*stdDev**2)))) 
+        second=stdDev*( exp(-( (d+2*readLen-1-mean)**2)/(float(2*stdDev**2))) - exp(-( (c_min+d+readLen-mean)**2)/(float(2*stdDev**2)))) 
         term1=first+second
 
         first=((pi/2)**0.5)*(c_min+c_max+d-mean+1)*( erf((c_min+c_max+d-mean)/(2**0.5*float(stdDev))) - erf((c_max+readLen+d-mean)/(2**0.5*float(stdDev)))  )
         #print 'First: ',first
-        second=stdDev*( 2.718**(-( (c_min+c_max+d-mean)**2)/(float(2*stdDev**2))) - 2.718**(-( (c_max+readLen+d-mean)**2)/(float(2*stdDev**2))))
+        second=stdDev*( exp(-( (c_min+c_max+d-mean)**2)/(float(2*stdDev**2))) - exp(-( (c_max+readLen+d-mean)**2)/(float(2*stdDev**2))))
         #print 'Second: ',second
         term3=first+second
         denom=term1+term2+term3
@@ -122,13 +82,6 @@ def funcDGeneral(obs_list,d,mean,stdDev,c1Len,c2Len,readLen):
     
     denominator=Denominator(d,c1Len,c2Len,readLen)
     nominator,case_nomin=Nominatortest(d,c_min,c_max,c1Len,c2Len,readLen)
-    ## Aofdlist=[]
-    ## for obs in obs_list:
-    ##     nominator,case_nomin=Nominator(obs,c_min,c_max,c1Len,c2Len,readLen)
-    ##     #sys.stdout.write(str(case_nomin))
-    ##     Aofdlist.append(nominator/float(denominator))
-    ## #print 'Nom: ',nominator
-    ## Aofd=float(sum(Aofdlist))/len(Aofdlist)
     Aofd=nominator/denominator
     func_of_d=d+Aofd*stdDev**2
     return func_of_d
@@ -137,8 +90,8 @@ def CalcMLvaluesOfdGeneral(obs_list,mean,stdDev,readLen,c1Len,c2Len,nr_links):
     #get observation    
     data_observation=(nr_links*mean -int(sum(obs_list)))/float(nr_links)
     #do binary search among values
-    d_upper=mean+6*stdDev
-    d_lower=-2*stdDev
+    d_upper=int(mean+2*stdDev-2*readLen)
+    d_lower=-10*stdDev
     while d_upper-d_lower>1:
         d_ML=(d_upper+d_lower)/2.0
         func_of_d=funcDGeneral(obs_list,d_ML,mean,stdDev,c1Len,c2Len,readLen)

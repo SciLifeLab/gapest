@@ -2,10 +2,6 @@
 Created on Sep 23, 2011
 
 @author: ksahlin
-
-Copyright: Kristoffer Sahlin
-License: GPL, see file License.txt
-
 '''
 #import numpy
 
@@ -59,10 +55,9 @@ def Main(contigfile_,bamfile,mean,edge_support,read_len,ratio,std_dev):
         sigma=std_dev
     else:
         sigma=False
-    (G,Contigs,Scaffolds,F,scaffold_indexer)=CG.PE(Contigs,Scaffolds,bamfile,mean,scaffold_indexer,F,read_length)      #Create graph, single out too short contigs/scaffolds and store them in F
-    #pre-calculate all possible d values for gap function
-    dValuesTableLongContigs=GC.PreCalcMLvaluesOfdLongContigs(mean,sigma,read_length)
-    GC.GapEstimator(G,Contigs,Scaffolds,mean,sigma,read_length,dValuesTableLongContigs,edge_support)
+    (G,Contigs,Scaffolds,F,scaffold_indexer)=CG.PE(Contigs,Scaffolds,bamfile,mean,std_dev,scaffold_indexer,F,read_length)      #Create graph, single out too short contigs/scaffolds and store 
+            
+    GC.GapEstimator(G,Contigs,Scaffolds,mean,sigma,read_length,edge_support)
 
 
 
@@ -93,7 +88,7 @@ if __name__ == '__main__':
     parser.add_option("-c", dest="contigfile",
                       help="file of contigs",type="string")
     
-    parser.add_option("-e",dest="edgesupport", nargs=1, default=5,
+    parser.add_option("-e",dest="edgesupport", nargs=1, default=10,
                       help="treshold value for the least nr of links that is needed to create an edge ",type="int")
        
     (options, args) = parser.parse_args()       
