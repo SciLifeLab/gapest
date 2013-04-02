@@ -95,7 +95,12 @@ if __name__ == '__main__':
         
 
 
+    try:
     #options.qacomputefile not needed yet, is not implemented yet
-    Main(options.contigfile,options.bamfiles,options.mean,options.edgesupport,options.readlen,options.relweight,options.stddev)
+        Main(options.contigfile,options.bamfiles,options.mean,options.edgesupport,options.readlen,options.relweight,options.stddev)
+    except:
+        print("Error: The command line options are not correct.")
+        parser.print_help()
+
         
         
