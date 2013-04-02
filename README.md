@@ -36,3 +36,6 @@ Example run
 Reference
 ---------
 http://bioinformatics.oxfordjournals.org/content/28/17/2215.long
+
+The supplemental materials to the above paper is found as a PDF
+in the docs directory. 
